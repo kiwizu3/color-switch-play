@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Reactive Circles</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: black;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 20rem;
+            height: 20rem;
+        }
+
+        .circle {
+            position: absolute;
+            display: block;
+            height: 10rem;
+            width: 10rem;
+            border-radius: 50%;
+            background: #efefef34;
+            animation: none;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        @keyframes waves {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="circle delay1"></div>
+        <div class="circle delay2"></div>
+        <div class="circle delay3"></div>
+        <div class="circle delay4"></div>
+    </div>
+
+    <script>
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+
+                // Circle elements
+                const circles = document.querySelectorAll('.circle');
+
+                function animate() {
+                    analyser.getByteFrequencyData(frequencyData);
+
+                    // Amplify bass frequencies for white intensity
+                    const bass = frequencyData.slice(0, 32).reduce((a, b) => a + b, 0) / 32 * 1.5;
+                    const whiteValue = Math.min(bass, 255);
+                    document.body.style.backgroundColor = `rgb(${whiteValue}, ${whiteValue}, ${whiteValue})`;
+
+                    // React circles to sound with amplified scaling
+                    frequencyData.slice(0, 4).forEach((value, index) => {
+                        const amplifiedValue = value * 1.5; // Increase sensitivity
+                        const scale = Math.max(amplifiedValue / 128, 1.2); // Scale with minimum threshold
+                        const opacity = amplifiedValue / 255; // Dynamic opacity
+                        circles[index].style.transform = `scale(${scale})`;
+                        circles[index].style.opacity = opacity;
+                    });
+
+                    requestAnimationFrame(animate);
+                }
+
+                animate();
+            })
+            .catch(err => {
+                console.error('Microphone access denied:', err);
+                document.body.innerHTML = '<h1>Microphone access is required to visualize sound.</h1>';
+            });
+    </script>
+</body>
+</html>
